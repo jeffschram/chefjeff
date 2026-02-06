@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -19,10 +19,15 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
   const [instructions, setInstructions] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [imageStorageId, setImageStorageId] = useState<Id<"_storage"> | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const recipe = useQuery(api.recipes.get, recipeId ? { id: recipeId } : "skip");
   const createRecipe = useMutation(api.recipes.create);
   const updateRecipe = useMutation(api.recipes.update);
+  const generateUploadUrl = useMutation(api.recipes.generateUploadUrl);
   const importFromUrl = useAction(api.importRecipe.importFromUrl);
 
   const isEditing = !!recipeId;
@@ -48,6 +53,12 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       setDescription(result.description);
       setIngredients(result.ingredients);
       setInstructions(result.instructions);
+      if (result.imageStorageId) {
+        setImageStorageId(result.imageStorageId as Id<"_storage">);
+      }
+      if (result.imageUrl) {
+        setImagePreview(result.imageUrl);
+      }
       toast.success("Recipe imported successfully! Review the fields below.");
     } catch (error: any) {
       toast.error(error.message || "Failed to import recipe from URL");
@@ -63,8 +74,61 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       setDescription(recipe.description);
       setIngredients(recipe.ingredients);
       setInstructions(recipe.instructions);
+      if (recipe.imageStorageId) {
+        setImageStorageId(recipe.imageStorageId);
+      }
+      if (recipe.imageUrl) {
+        setImagePreview(recipe.imageUrl);
+      }
     }
   }, [recipe]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be smaller than 10MB");
+      return;
+    }
+
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setImagePreview(localUrl);
+
+    setIsUploading(true);
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      const { storageId } = await response.json();
+      setImageStorageId(storageId as Id<"_storage">);
+      toast.success("Image uploaded!");
+    } catch {
+      toast.error("Failed to upload image");
+      setImagePreview(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageStorageId(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +148,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
           description: description.trim(),
           ingredients: ingredients.trim(),
           instructions: instructions.trim(),
+          imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe updated successfully!");
       } else {
@@ -93,6 +158,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
           description: description.trim(),
           ingredients: ingredients.trim(),
           instructions: instructions.trim(),
+          imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe created successfully!");
       }
@@ -157,6 +223,65 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       )}
 
       <form className="recipe-form" onSubmit={handleSubmit}>
+        {/* Image Upload */}
+        <div className="form-group">
+          <label>Recipe Image</label>
+          <div className="image-upload-area">
+            {imagePreview || imageStorageId ? (
+              <div className="image-preview-container">
+                {imagePreview && (
+                  <img src={imagePreview} alt="Recipe preview" className="image-preview" />
+                )}
+                {!imagePreview && imageStorageId && (
+                  <div className="image-preview-placeholder">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <span>Image attached (save to preview)</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="image-remove-btn"
+                  onClick={handleRemoveImage}
+                  title="Remove image"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <label className="image-upload-dropzone" htmlFor="image-upload">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span>{isUploading ? "Uploading..." : "Click to upload an image"}</span>
+                <span className="image-upload-hint">JPG, PNG, WebP — max 10MB</span>
+              </label>
+            )}
+            <input
+              ref={fileInputRef}
+              id="image-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={isUploading}
+              style={{ display: "none" }}
+            />
+            {(imagePreview || imageStorageId) && (
+              <label htmlFor="image-upload" className="btn btn-secondary image-change-btn">
+                Change Image
+              </label>
+            )}
+          </div>
+        </div>
+
         <div className="form-group">
           <label>Recipe Name *</label>
           <RichTextEditor

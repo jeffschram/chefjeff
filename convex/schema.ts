@@ -8,6 +8,7 @@ export default defineSchema({
     description: v.string(),
     ingredients: v.string(),
     instructions: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
     userId: v.string(), // Changed from v.id("users") to v.string() for dev
   }).index("by_user", ["userId"]),
 });
