@@ -57,6 +57,114 @@ function resolveUrl(url: string, baseUrl: string): string {
   }
 }
 
+export const importFromPhoto = action({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    // Get the image from Convex storage
+    const imageUrl = await ctx.storage.getUrl(args.storageId);
+    if (!imageUrl) {
+      throw new Error("Could not retrieve the uploaded image");
+    }
+
+    // Download the image and convert to base64
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error("Failed to read the uploaded image");
+    }
+
+    const imageBlob = await imageResponse.blob();
+    const arrayBuffer = await imageBlob.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+
+    // Determine the media type
+    const contentType = imageBlob.type || "image/jpeg";
+    const mediaType = contentType.startsWith("image/")
+      ? (contentType as "image/jpeg" | "image/png" | "image/gif" | "image/webp")
+      : "image/jpeg";
+
+    // Use Claude vision to extract recipe from the image
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 3000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mediaType,
+                  data: base64Data,
+                },
+              },
+              {
+                type: "text",
+                text: `Look at this image of a recipe. It may be handwritten, printed, from a cookbook, or a screenshot. Extract the recipe and return ONLY valid JSON with no additional text, markdown, or code fences.
+
+The JSON must have these exact fields:
+- "name": The recipe title/name (string)
+- "source": Where this recipe appears to be from, e.g. "Handwritten", "Cookbook", or a specific name if visible (string)
+- "description": A brief 1-3 sentence description of the dish based on what you can see (string)
+- "ingredients": The full ingredients list, with each ingredient on its own line (string)
+- "instructions": The full step-by-step instructions, numbered, with each step on its own line (string)
+
+For ingredients, format each on its own line like:
+- 2 cups flour
+- 1 tsp salt
+
+For instructions, format numbered steps like:
+1. Preheat the oven to 350°F.
+2. Mix the dry ingredients together.
+
+If you cannot find or read a recipe in this image, return: {"error": "Could not read a recipe from this image"}`,
+              },
+            ],
+          },
+        ],
+      });
+
+      const content =
+        message.content[0]?.type === "text" ? message.content[0].text : null;
+      if (!content) {
+        throw new Error("No response from AI");
+      }
+
+      // Parse the JSON response (strip any accidental markdown fences)
+      const jsonStr = content
+        .replace(/^```json?\s*\n?/, "")
+        .replace(/\n?```\s*$/, "")
+        .trim();
+      const parsed = JSON.parse(jsonStr);
+
+      if (parsed.error) {
+        throw new Error(parsed.error);
+      }
+
+      return {
+        name: parsed.name || "",
+        source: parsed.source || "",
+        description: parsed.description || "",
+        ingredients: parsed.ingredients || "",
+        instructions: parsed.instructions || "",
+      };
+    } catch (error: any) {
+      if (error.message?.includes("Could not read")) {
+        throw new Error(error.message);
+      }
+      if (error instanceof SyntaxError) {
+        throw new Error("Failed to parse the AI response. Please try again.");
+      }
+      throw new Error(`AI extraction failed: ${error.message}`);
+    }
+  },
+});
+
 export const importFromUrl = action({
   args: { url: v.string() },
   handler: async (ctx, args) => {

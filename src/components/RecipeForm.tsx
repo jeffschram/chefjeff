@@ -19,6 +19,8 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
   const [instructions, setInstructions] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanPreview, setScanPreview] = useState<string | null>(null);
   const [imageStorageId, setImageStorageId] = useState<Id<"_storage"> | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -29,6 +31,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
   const updateRecipe = useMutation(api.recipes.update);
   const generateUploadUrl = useMutation(api.recipes.generateUploadUrl);
   const importFromUrl = useAction(api.importRecipe.importFromUrl);
+  const importFromPhoto = useAction(api.importRecipe.importFromPhoto);
 
   const isEditing = !!recipeId;
 
@@ -64,6 +67,54 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       toast.error(error.message || "Failed to import recipe from URL");
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleScanPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be smaller than 10MB");
+      return;
+    }
+
+    // Show preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setScanPreview(localUrl);
+    setIsScanning(true);
+
+    try {
+      // Upload the image to Convex storage first
+      const uploadUrl = await generateUploadUrl();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      const { storageId } = await uploadResponse.json();
+
+      // Now call Claude vision to analyze it
+      const result = await importFromPhoto({ storageId: storageId as Id<"_storage"> });
+      setName(result.name);
+      setSource(result.source);
+      setDescription(result.description);
+      setIngredients(result.ingredients);
+      setInstructions(result.instructions);
+      toast.success("Recipe extracted from photo! Review the fields below.");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to extract recipe from photo");
+    } finally {
+      setIsScanning(false);
+      setScanPreview(null);
+      // Reset the file input so the same file can be re-selected
+      const target = e.target;
+      if (target) target.value = "";
     }
   };
 
@@ -219,6 +270,41 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {!isEditing && (
+        <div className="import-card scan-card">
+          <div className="import-card-header">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+            <h3>Scan a Recipe Photo</h3>
+          </div>
+          <p className="import-card-description">
+            Take a picture or upload a photo of a recipe — handwritten, printed, or from a cookbook. AI will read it and fill in the details.
+          </p>
+
+          {isScanning && scanPreview ? (
+            <div className="scan-preview-area">
+              <img src={scanPreview} alt="Scanning…" className="scan-preview-img" />
+              <div className="scan-overlay">
+                <span className="btn-spinner" />
+                <span>Reading recipe…</span>
+              </div>
+            </div>
+          ) : (
+            <div className="scan-file-input">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleScanPhoto}
+                disabled={isScanning}
+              />
+              <span className="scan-file-hint">JPG, PNG, WebP — max 5MB</span>
+            </div>
+          )}
         </div>
       )}
 
