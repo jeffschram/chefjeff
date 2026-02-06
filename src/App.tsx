@@ -33,7 +33,17 @@ export default function App() {
         <Content currentView={currentView} setCurrentView={setCurrentView} />
       </main>
       
-      <Toaster />
+      <Toaster
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: '#262019',
+            border: '1px solid #3a322a',
+            color: '#e8ddd0',
+            fontFamily: "'Outfit', system-ui, sans-serif",
+          },
+        }}
+      />
     </div>
   );
 }

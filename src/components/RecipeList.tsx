@@ -21,8 +21,9 @@ export function RecipeList({ onCreateNew, onViewRecipe }: RecipeListProps) {
 
       {recipes.length === 0 ? (
         <div className="empty-state">
+          <div style={{ fontSize: '3rem', marginBottom: '0.5rem', opacity: 0.3 }}>✦</div>
           <h3>No recipes yet</h3>
-          <p>Start building your recipe collection by creating your first recipe!</p>
+          <p>Start building your recipe collection by creating your first recipe.</p>
           <button className="btn btn-primary" onClick={onCreateNew}>
             Create Your First Recipe
           </button>
