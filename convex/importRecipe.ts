@@ -4,11 +4,65 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import Anthropic from "@anthropic-ai/sdk";
 
+/**
+ * Extract the best recipe image URL from raw HTML.
+ * Priority: og:image > schema.org recipe image > first large content image
+ */
+function extractImageUrl(html: string, baseUrl: string): string | null {
+  // 1. Try og:image meta tag
+  const ogMatch = html.match(
+    /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i
+  ) || html.match(
+    /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i
+  );
+  if (ogMatch?.[1]) return resolveUrl(ogMatch[1], baseUrl);
+
+  // 2. Try schema.org JSON-LD recipe image
+  const jsonLdMatches = html.matchAll(
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  );
+  for (const match of jsonLdMatches) {
+    try {
+      const data = JSON.parse(match[1]);
+      const recipe = Array.isArray(data) ? data.find((d: any) => d["@type"] === "Recipe") : (data["@type"] === "Recipe" ? data : null);
+      if (recipe?.image) {
+        const img = Array.isArray(recipe.image) ? recipe.image[0] : (typeof recipe.image === 'object' && recipe.image.url ? recipe.image.url : recipe.image);
+        if (typeof img === 'string') return resolveUrl(img, baseUrl);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  // 3. Try first large content image (skip icons, avatars, ads)
+  const imgMatches = html.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*/gi);
+  for (const match of imgMatches) {
+    const src = match[1];
+    // Skip tiny images, trackers, icons, svgs
+    if (src.includes('1x1') || src.includes('pixel') || src.includes('.svg') || src.includes('icon') || src.includes('logo') || src.includes('avatar') || src.includes('ad-') || src.includes('data:image')) continue;
+    // Look for width/height hints suggesting a real photo
+    const widthMatch = match[0].match(/width=["']?(\d+)/i);
+    if (widthMatch && parseInt(widthMatch[1]) < 200) continue;
+    return resolveUrl(src, baseUrl);
+  }
+
+  return null;
+}
+
+function resolveUrl(url: string, baseUrl: string): string {
+  try {
+    return new URL(url, baseUrl).href;
+  } catch {
+    return url;
+  }
+}
+
 export const importFromUrl = action({
   args: { url: v.string() },
   handler: async (ctx, args) => {
     // Fetch the webpage content
     let pageContent: string;
+    let rawHtml: string;
     try {
       const response = await fetch(args.url, {
         headers: {
@@ -22,10 +76,10 @@ export const importFromUrl = action({
         throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
       }
 
-      const html = await response.text();
+      rawHtml = await response.text();
 
       // Strip HTML tags and extract text content, keeping some structure
-      pageContent = html
+      pageContent = rawHtml
         // Remove script and style blocks entirely
         .replace(/<script[\s\S]*?<\/script>/gi, "")
         .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -55,6 +109,36 @@ export const importFromUrl = action({
       }
     } catch (error: any) {
       throw new Error(`Could not fetch the recipe URL: ${error.message}`);
+    }
+
+    // Extract image URL from the raw HTML before stripping
+    const imageUrl = extractImageUrl(rawHtml, args.url);
+
+    // Download and store the image in Convex storage if found
+    let imageStorageId: string | null = null;
+    if (imageUrl) {
+      try {
+        const imgResponse = await fetch(imageUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (compatible; RecipeImporter/1.0; +http://example.com)",
+            Accept: "image/*",
+          },
+        });
+        if (imgResponse.ok) {
+          const contentType = imgResponse.headers.get("content-type") || "image/jpeg";
+          // Only store actual images
+          if (contentType.startsWith("image/")) {
+            const blob = await imgResponse.blob();
+            // Only store if image is reasonably sized (< 10MB)
+            if (blob.size < 10 * 1024 * 1024) {
+              imageStorageId = await ctx.storage.store(blob) as unknown as string;
+            }
+          }
+        }
+      } catch {
+        // Image download failed, continue without image
+      }
     }
 
     // Use Anthropic Claude to extract recipe data
@@ -119,6 +203,8 @@ ${pageContent}`,
         description: parsed.description || "",
         ingredients: parsed.ingredients || "",
         instructions: parsed.instructions || "",
+        imageStorageId,
+        imageUrl: imageUrl || null,
       };
     } catch (error: any) {
       if (error.message?.includes("No recipe found")) {

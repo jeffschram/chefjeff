@@ -7,11 +7,21 @@ const DEV_USER_ID = "k17f8f7j9j8h7g6f5d4s3a2q1w0e9r8t" as any;
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
+    const recipes = await ctx.db
       .query("recipes")
       .withIndex("by_user", (q) => q.eq("userId", DEV_USER_ID))
       .order("desc")
       .collect();
+
+    // Resolve image URLs for each recipe
+    return await Promise.all(
+      recipes.map(async (recipe) => ({
+        ...recipe,
+        imageUrl: recipe.imageStorageId
+          ? await ctx.storage.getUrl(recipe.imageStorageId)
+          : null,
+      }))
+    );
   },
 });
 
@@ -22,8 +32,13 @@ export const get = query({
     if (!recipe || recipe.userId !== DEV_USER_ID) {
       return null;
     }
-    
-    return recipe;
+
+    return {
+      ...recipe,
+      imageUrl: recipe.imageStorageId
+        ? await ctx.storage.getUrl(recipe.imageStorageId)
+        : null,
+    };
   },
 });
 
@@ -34,6 +49,7 @@ export const create = mutation({
     description: v.string(),
     ingredients: v.string(),
     instructions: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("recipes", {
@@ -51,13 +67,14 @@ export const update = mutation({
     description: v.string(),
     ingredients: v.string(),
     instructions: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const recipe = await ctx.db.get(args.id);
     if (!recipe || recipe.userId !== DEV_USER_ID) {
       throw new Error("Recipe not found or access denied");
     }
-    
+
     const { id, ...updates } = args;
     await ctx.db.patch(id, updates);
   },
@@ -70,7 +87,19 @@ export const remove = mutation({
     if (!recipe || recipe.userId !== DEV_USER_ID) {
       throw new Error("Recipe not found or access denied");
     }
-    
+
+    // Clean up stored image if any
+    if (recipe.imageStorageId) {
+      await ctx.storage.delete(recipe.imageStorageId);
+    }
+
     await ctx.db.delete(args.id);
+  },
+});
+
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
   },
 });
