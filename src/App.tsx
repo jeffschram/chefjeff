@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { RecipeList } from "./components/RecipeList";
 import { RecipeForm } from "./components/RecipeForm";
 import { RecipeView } from "./components/RecipeView";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 export default function App() {
   const navigate = useNavigate();
@@ -27,8 +28,11 @@ export default function App() {
               </defs>
             </svg>
           </h1>
-          <div className="user-info">
-            <span>Welcome, Jeff Schram</span>
+          <div className="header-right">
+            <ThemeToggle />
+            <div className="user-info">
+              <span>Welcome, Jeff Schram</span>
+            </div>
           </div>
         </div>
       </header>
@@ -43,12 +47,12 @@ export default function App() {
       </main>
 
       <Toaster
-        theme="dark"
+        theme={document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"}
         toastOptions={{
           style: {
-            background: '#262019',
-            border: '1px solid #3a322a',
-            color: '#e8ddd0',
+            background: 'var(--color-surface-raised)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text)',
             fontFamily: "'Outfit', system-ui, sans-serif",
           },
         }}
