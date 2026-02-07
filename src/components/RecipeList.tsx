@@ -3,54 +3,109 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 
+/** Strip HTML tags for plain-text search matching */
+function stripHtml(html: string) {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 export function RecipeList() {
   const allRecipes = useQuery(api.recipes.list) || [];
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Search query from URL
+  const searchQuery = searchParams.get("q") ?? "";
+
   // Multi-select: read all values for each key
   const selectedCategories = searchParams.getAll("category");
   const selectedTags = searchParams.getAll("tag");
-  const hasFilters = selectedCategories.length > 0 || selectedTags.length > 0;
+  const hasFilters = selectedCategories.length > 0 || selectedTags.length > 0 || searchQuery.length > 0;
 
-  // Client-side filtering (AND across categories, AND across tags)
+  // Client-side filtering (categories + tags + text search)
   const recipes = allRecipes.filter((r) => {
     if (selectedCategories.length > 0 && !selectedCategories.includes(r.category ?? "")) return false;
     if (selectedTags.length > 0 && !selectedTags.every((t) => (r.tags ?? []).includes(t))) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const haystack = [
+        stripHtml(r.name),
+        stripHtml(r.description),
+        stripHtml(r.ingredients),
+        stripHtml(r.instructions),
+        stripHtml(r.source ?? ""),
+        r.category?.toLowerCase() ?? "",
+        ...(r.tags ?? []).map((t: string) => t.toLowerCase()),
+      ].join(" ");
+      if (!haystack.includes(q)) return false;
+    }
     return true;
   });
 
-  // Collect unique categories and tags + counts (from ALL recipes, not filtered)
+  // Compute "available" counts so we can disable zero-result options.
+  // Category counts: from recipes matching search + tags (ignore category filter)
+  // Tag counts: from the fully-filtered recipe set (search + categories + tags)
   const { categoryOptions, tagOptions } = useMemo(() => {
+    // Pool for category counts: apply search + tags but NOT categories
+    const catPool = allRecipes.filter((r) => {
+      if (selectedTags.length > 0 && !selectedTags.every((t) => (r.tags ?? []).includes(t))) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const haystack = [
+          stripHtml(r.name), stripHtml(r.description), stripHtml(r.ingredients),
+          stripHtml(r.instructions), stripHtml(r.source ?? ""),
+          r.category?.toLowerCase() ?? "",
+          ...(r.tags ?? []).map((t: string) => t.toLowerCase()),
+        ].join(" ");
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+
     const catCounts = new Map<string, number>();
-    const tagCounts = new Map<string, number>();
-    for (const r of allRecipes) {
+    for (const r of catPool) {
       if (r.category) catCounts.set(r.category, (catCounts.get(r.category) ?? 0) + 1);
+    }
+
+    // Tag counts: from the fully-filtered set (= recipes)
+    const tagCounts = new Map<string, number>();
+    for (const r of recipes) {
       for (const t of r.tags ?? []) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
     }
+    // Also include tags that exist globally so they still appear in the list (with count 0)
+    for (const r of allRecipes) {
+      for (const t of r.tags ?? []) {
+        if (!tagCounts.has(t)) tagCounts.set(t, 0);
+      }
+    }
+
     return {
       categoryOptions: [...catCounts.entries()].sort((a, b) => b[1] - a[1]),
       tagOptions: [...tagCounts.entries()].sort((a, b) => b[1] - a[1]),
     };
-  }, [allRecipes]);
+  }, [allRecipes, recipes, selectedTags, searchQuery]);
 
-  const hasSidebarContent = categoryOptions.length > 0 || tagOptions.length > 0;
+  const hasSidebarContent = allRecipes.length > 0;
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const filterCount = selectedCategories.length + selectedTags.length;
+  const filterCount = selectedCategories.length + selectedTags.length + (searchQuery ? 1 : 0);
 
-  // Toggle a category or tag checkbox
+  // Update search query in URL params (preserves existing category/tag params)
+  const setSearch = (value: string) => {
+    setSearchParams(buildSearchParams(selectedCategories, selectedTags, value), { replace: true });
+  };
+
+  // Toggle a category or tag checkbox (preserves search query)
   const toggleCategory = (cat: string) => {
     const next = selectedCategories.includes(cat)
       ? selectedCategories.filter((c) => c !== cat)
       : [...selectedCategories, cat];
-    setSearchParams(buildSearchParams(next, selectedTags));
+    setSearchParams(buildSearchParams(next, selectedTags, searchQuery));
   };
 
   const toggleTag = (tag: string) => {
     const next = selectedTags.includes(tag)
       ? selectedTags.filter((t) => t !== tag)
       : [...selectedTags, tag];
-    setSearchParams(buildSearchParams(selectedCategories, next));
+    setSearchParams(buildSearchParams(selectedCategories, next, searchQuery));
   };
 
   const clearFilters = () => setSearchParams({});
@@ -90,7 +145,34 @@ export function RecipeList() {
         {/* Sidebar filter panel */}
         {hasSidebarContent && (
           <aside className={`filter-sidebar ${mobileFiltersOpen ? "filter-sidebar--mobile-open" : ""}`}>
-            {hasFilters && (
+            {/* Search */}
+            <div className="filter-search">
+              <svg className="filter-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search recipes…"
+                className="filter-search-input"
+              />
+              {searchQuery && (
+                <button
+                  className="filter-search-clear"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {hasFilters && (selectedCategories.length > 0 || selectedTags.length > 0) && (
               <div className="filter-sidebar-active">
                 <div className="filter-sidebar-active-chips">
                   {selectedCategories.map((cat) => (
@@ -122,20 +204,25 @@ export function RecipeList() {
               <div className="filter-section">
                 <h4 className="filter-section-title">Category</h4>
                 <ul className="filter-checkbox-list">
-                  {categoryOptions.map(([cat, count]) => (
-                    <li key={cat}>
-                      <label className="filter-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={selectedCategories.includes(cat)}
-                          onChange={() => toggleCategory(cat)}
-                        />
-                        <span className="filter-checkbox-mark" />
-                        <span className="filter-checkbox-label">{cat}</span>
-                        <span className="filter-checkbox-count">{count}</span>
-                      </label>
-                    </li>
-                  ))}
+                  {categoryOptions.map(([cat, count]) => {
+                    const checked = selectedCategories.includes(cat);
+                    const disabled = count === 0 && !checked;
+                    return (
+                      <li key={cat}>
+                        <label className={`filter-checkbox ${disabled ? "filter-checkbox--disabled" : ""}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => toggleCategory(cat)}
+                          />
+                          <span className="filter-checkbox-mark" />
+                          <span className="filter-checkbox-label">{cat}</span>
+                          <span className="filter-checkbox-count">{count}</span>
+                        </label>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -144,20 +231,25 @@ export function RecipeList() {
               <div className="filter-section">
                 <h4 className="filter-section-title">Tags</h4>
                 <ul className="filter-checkbox-list">
-                  {tagOptions.map(([tag, count]) => (
-                    <li key={tag}>
-                      <label className="filter-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={selectedTags.includes(tag)}
-                          onChange={() => toggleTag(tag)}
-                        />
-                        <span className="filter-checkbox-mark" />
-                        <span className="filter-checkbox-label">{tag}</span>
-                        <span className="filter-checkbox-count">{count}</span>
-                      </label>
-                    </li>
-                  ))}
+                  {tagOptions.map(([tag, count]) => {
+                    const checked = selectedTags.includes(tag);
+                    const disabled = count === 0 && !checked;
+                    return (
+                      <li key={tag}>
+                        <label className={`filter-checkbox ${disabled ? "filter-checkbox--disabled" : ""}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => toggleTag(tag)}
+                          />
+                          <span className="filter-checkbox-mark" />
+                          <span className="filter-checkbox-label">{tag}</span>
+                          <span className="filter-checkbox-count">{count}</span>
+                        </label>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -246,13 +338,10 @@ export function RecipeList() {
   );
 }
 
-/** Helper to build URLSearchParams from arrays */
-function buildSearchParams(categories: string[], tags: string[]) {
-  const p: Record<string, string[]> = {};
-  if (categories.length) p.category = categories;
-  if (tags.length) p.tag = tags;
-  // URLSearchParams doesn't support arrays in the constructor, so build manually
+/** Helper to build URLSearchParams from arrays, preserving search query */
+function buildSearchParams(categories: string[], tags: string[], query = "") {
   const sp = new URLSearchParams();
+  if (query.trim()) sp.set("q", query);
   categories.forEach((c) => sp.append("category", c));
   tags.forEach((t) => sp.append("tag", t));
   return sp;
