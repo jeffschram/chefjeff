@@ -2,16 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RichTextEditor } from "./RichTextEditor";
 
-interface RecipeFormProps {
-  recipeId?: Id<"recipes">;
-  onCancel: () => void;
-  onSave: () => void;
-}
+export function RecipeForm() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const recipeId = id ? (id as Id<"recipes">) : undefined;
+  const isEditing = !!recipeId;
 
-export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
   const [name, setName] = useState("");
   const [source, setSource] = useState("");
   const [description, setDescription] = useState("");
@@ -33,7 +33,13 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
   const importFromUrl = useAction(api.importRecipe.importFromUrl);
   const importFromPhoto = useAction(api.importRecipe.importFromPhoto);
 
-  const isEditing = !!recipeId;
+  const handleCancel = () => {
+    if (isEditing && recipeId) {
+      navigate(`/recipe/${recipeId}`);
+    } else {
+      navigate("/");
+    }
+  };
 
   const handleImport = async () => {
     if (!importUrl.trim()) {
@@ -195,6 +201,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
           imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe updated successfully!");
+        navigate(`/recipe/${recipeId}`);
       } else {
         await createRecipe({
           name: name.trim(),
@@ -205,8 +212,8 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
           imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe created successfully!");
+        navigate("/");
       }
-      onSave();
     } catch (error) {
       toast.error("Failed to save recipe");
     }
@@ -217,7 +224,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       {/* Header bar */}
       <div className="recipe-form-header">
         <h2>{isEditing ? "Edit Recipe" : "Create New Recipe"}</h2>
-        <button className="btn btn-secondary" onClick={onCancel}>
+        <button className="btn btn-secondary" onClick={handleCancel}>
           Cancel
         </button>
       </div>
@@ -389,7 +396,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
 
         {/* Actions */}
         <div className="form-actions">
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          <button type="button" className="btn btn-secondary" onClick={handleCancel}>
             Cancel
           </button>
           <button type="submit" className="btn btn-primary">
