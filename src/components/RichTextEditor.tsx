@@ -1,12 +1,14 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** When true, renders as a single-line inline field (no min-height, no lists) */
+  compact?: boolean;
 }
 
 function MenuBar({ editor }: { editor: ReturnType<typeof useEditor> }) {
@@ -102,11 +104,18 @@ function MenuBar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   );
 }
 
-export function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, placeholder, compact }: RichTextEditorProps) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const handleFocus = useCallback(() => setIsFocused(true), []);
+  const handleBlur = useCallback(() => {
+    // Small delay so toolbar button clicks register before hiding
+    setTimeout(() => setIsFocused(false), 150);
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Disable features we don't need
         heading: false,
         blockquote: false,
         codeBlock: false,
@@ -125,9 +134,11 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    onFocus: handleFocus,
+    onBlur: handleBlur,
     editorProps: {
       attributes: {
-        class: "rich-editor-content",
+        class: `rich-editor-content${compact ? " rich-editor-content--compact" : ""}`,
         ...(placeholder ? { "data-placeholder": placeholder } : {}),
       },
     },
@@ -136,15 +147,24 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   // Sync external content changes (e.g. from URL import)
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      // If content looks like plain text (no HTML tags), convert line-based text to HTML
       const htmlContent = content.includes("<") ? content : plainTextToHtml(content);
       editor.commands.setContent(htmlContent);
     }
   }, [content, editor]);
 
+  const editorClasses = [
+    "rich-editor",
+    compact ? "rich-editor--compact" : "",
+    isFocused ? "rich-editor--focused" : "",
+  ].filter(Boolean).join(" ");
+
   return (
-    <div className="rich-editor">
-      <MenuBar editor={editor} />
+    <div className={editorClasses}>
+      {!compact && (
+        <div className={`editor-toolbar-wrap${isFocused ? " editor-toolbar-wrap--visible" : ""}`}>
+          <MenuBar editor={editor} />
+        </div>
+      )}
       <EditorContent editor={editor} />
     </div>
   );
@@ -165,7 +185,6 @@ function plainTextToHtml(text: string): string {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Unordered list item
     if (/^[-•*]\s+/.test(trimmed)) {
       if (inOl) { html += "</ol>"; inOl = false; }
       if (!inUl) { html += "<ul>"; inUl = true; }
@@ -173,7 +192,6 @@ function plainTextToHtml(text: string): string {
       continue;
     }
 
-    // Ordered list item
     if (/^\d+[.)]\s+/.test(trimmed)) {
       if (inUl) { html += "</ul>"; inUl = false; }
       if (!inOl) { html += "<ol>"; inOl = true; }
@@ -181,17 +199,14 @@ function plainTextToHtml(text: string): string {
       continue;
     }
 
-    // Close any open lists
     if (inUl) { html += "</ul>"; inUl = false; }
     if (inOl) { html += "</ol>"; inOl = false; }
 
-    // Empty line or regular paragraph
     if (trimmed) {
       html += `<p>${trimmed}</p>`;
     }
   }
 
-  // Close any remaining open lists
   if (inUl) html += "</ul>";
   if (inOl) html += "</ol>";
 
