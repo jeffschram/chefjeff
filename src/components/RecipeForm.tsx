@@ -7,10 +7,16 @@ import { toast } from "sonner";
 import { RichTextEditor } from "./RichTextEditor";
 
 export function RecipeForm() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const recipeId = id ? (id as Id<"recipes">) : undefined;
-  const isEditing = !!recipeId;
+
+  // If we have a slug, look up the recipe to get its ID for editing
+  const recipeBySlug = useQuery(
+    api.recipes.getBySlug,
+    slug ? { slug } : "skip"
+  );
+  const recipeId = recipeBySlug?._id;
+  const isEditing = !!slug;
 
   const [name, setName] = useState("");
   const [source, setSource] = useState("");
@@ -26,7 +32,6 @@ export function RecipeForm() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const recipe = useQuery(api.recipes.get, recipeId ? { id: recipeId } : "skip");
   const createRecipe = useMutation(api.recipes.create);
   const updateRecipe = useMutation(api.recipes.update);
   const generateUploadUrl = useMutation(api.recipes.generateUploadUrl);
@@ -34,8 +39,8 @@ export function RecipeForm() {
   const importFromPhoto = useAction(api.importRecipe.importFromPhoto);
 
   const handleCancel = () => {
-    if (isEditing && recipeId) {
-      navigate(`/recipe/${recipeId}`);
+    if (isEditing && slug) {
+      navigate(`/recipe/${slug}`);
     } else {
       navigate("/");
     }
@@ -121,20 +126,20 @@ export function RecipeForm() {
   };
 
   useEffect(() => {
-    if (recipe) {
-      setName(recipe.name);
-      setSource(recipe.source || "");
-      setDescription(recipe.description);
-      setIngredients(recipe.ingredients);
-      setInstructions(recipe.instructions);
-      if (recipe.imageStorageId) {
-        setImageStorageId(recipe.imageStorageId);
+    if (recipeBySlug) {
+      setName(recipeBySlug.name);
+      setSource(recipeBySlug.source || "");
+      setDescription(recipeBySlug.description);
+      setIngredients(recipeBySlug.ingredients);
+      setInstructions(recipeBySlug.instructions);
+      if (recipeBySlug.imageStorageId) {
+        setImageStorageId(recipeBySlug.imageStorageId);
       }
-      if (recipe.imageUrl) {
-        setImagePreview(recipe.imageUrl);
+      if (recipeBySlug.imageUrl) {
+        setImagePreview(recipeBySlug.imageUrl);
       }
     }
-  }, [recipe]);
+  }, [recipeBySlug]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -191,7 +196,7 @@ export function RecipeForm() {
 
     try {
       if (isEditing && recipeId) {
-        await updateRecipe({
+        const result = await updateRecipe({
           id: recipeId,
           name: name.trim(),
           source: source.trim() || undefined,
@@ -201,9 +206,10 @@ export function RecipeForm() {
           imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe updated successfully!");
-        navigate(`/recipe/${recipeId}`);
+        // Navigate to potentially updated slug
+        navigate(`/recipe/${result.slug}`);
       } else {
-        await createRecipe({
+        const result = await createRecipe({
           name: name.trim(),
           source: source.trim() || undefined,
           description: description.trim(),
@@ -212,12 +218,32 @@ export function RecipeForm() {
           imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe created successfully!");
-        navigate("/");
+        navigate(`/recipe/${result.slug}`);
       }
     } catch (error) {
       toast.error("Failed to save recipe");
     }
   };
+
+  // Show loading while fetching recipe for edit
+  if (isEditing && recipeBySlug === undefined) {
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  if (isEditing && recipeBySlug === null) {
+    return (
+      <div className="error-state">
+        <h2>Recipe not found</h2>
+        <button className="btn btn-primary" onClick={() => navigate("/")}>
+          Back to Recipes
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="recipe-form-container">

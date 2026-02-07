@@ -47,7 +47,7 @@
   --color-secondary: #9c8b7a;
   --color-secondary-hover: #b09e8d;
 
-  --color-danger: #c45d4d;
+  --color-danger: #A9411D;
   --color-danger-hover: #d4706a;
   --color-success: #7a9e6e;
   --color-success-hover: #8fb382;
@@ -162,19 +162,24 @@ body {
 }
 
 .app-title {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
   color: var(--color-primary);
   cursor: pointer;
-  transition: color 0.3s ease, text-shadow 0.3s ease;
-  letter-spacing: 0.02em;
-  font-style: italic;
+  transition: color 0.3s ease, filter 0.3s ease;
+  line-height: 1;
+  margin: 0;
+}
+
+.app-title svg {
+  display: block;
+  height: 28px;
+  width: auto;
 }
 
 .app-title:hover {
   color: var(--color-primary-hover);
-  text-shadow: 0 0 24px rgba(200, 149, 108, 0.2);
+  filter: drop-shadow(0 0 12px rgba(200, 149, 108, 0.25));
 }
 
 .user-info {
