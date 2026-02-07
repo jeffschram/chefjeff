@@ -68,21 +68,17 @@ export function RecipeView() {
 
         <header className="recipe-header">
           <h1 className="rich-content" dangerouslySetInnerHTML={{ __html: recipe.name }} />
-          {recipe.source && (
-            <p className="recipe-source">Source: <span className="rich-content" dangerouslySetInnerHTML={{ __html: recipe.source }} /></p>
-          )}
-          <p className="recipe-meta">
-            Created: {new Date(recipe._creationTime).toLocaleDateString()}
-          </p>
-        </header>
-
-        <section className="recipe-section">
-          <h2>Description</h2>
           <div
-            className="recipe-text rich-content"
+            className="recipe-description rich-content"
             dangerouslySetInnerHTML={{ __html: recipe.description }}
           />
-        </section>
+          <p className="recipe-meta">
+            {new Date(recipe._creationTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            {recipe.source && (
+              <span className="recipe-source-inline rich-content" dangerouslySetInnerHTML={{ __html: recipe.source }} />
+            )}
+          </p>
+        </header>
 
         <section className="recipe-section">
           <h2>Ingredients</h2>

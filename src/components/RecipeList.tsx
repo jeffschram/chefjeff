@@ -38,13 +38,13 @@ export function RecipeList() {
               <div className="recipe-card-body">
                 <h3 className="recipe-title rich-content" dangerouslySetInnerHTML={{ __html: recipe.name }} />
                 <div className="recipe-description rich-content" dangerouslySetInnerHTML={{ __html: recipe.description }} />
-                {recipe.source && (
-                  <p className="recipe-source">Source: <span className="rich-content" dangerouslySetInnerHTML={{ __html: recipe.source }} /></p>
-                )}
                 <div className="recipe-meta">
                   <span className="recipe-date">
-                    {new Date(recipe._creationTime).toLocaleDateString()}
+                    {new Date(recipe._creationTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
+                  {recipe.source && (
+                    <span className="recipe-source-inline rich-content" dangerouslySetInnerHTML={{ __html: recipe.source }} />
+                  )}
                 </div>
               </div>
             </div>
