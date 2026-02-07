@@ -668,6 +668,72 @@ body {
   border-radius: 2px;
 }
 
+/* Search input */
+.filter-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 0.6rem;
+  color: var(--color-text-dim);
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.filter-search:focus-within .filter-search-icon {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
+.filter-search-input {
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 2.1rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-search-input::placeholder {
+  color: var(--color-text-dim);
+  opacity: 0.5;
+}
+
+.filter-search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-muted);
+}
+
+.filter-search-clear {
+  position: absolute;
+  right: 0.35rem;
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.filter-search-clear:hover {
+  color: var(--color-text);
+  background: var(--color-surface-elevated);
+}
+
 .filter-sidebar-active {
   display: flex;
   flex-wrap: wrap;
@@ -851,6 +917,17 @@ body {
   opacity: 0.6;
   min-width: 1.2em;
   text-align: right;
+}
+
+.filter-checkbox--disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: default;
+}
+.filter-checkbox--disabled .filter-checkbox-label {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--color-text-dim);
 }
 
 .filter-count {
@@ -2088,6 +2165,11 @@ body {
     margin-bottom: 0;
     flex: 1;
     min-width: 140px;
+  }
+
+  .filter-search {
+    width: 100%;
+    margin-bottom: var(--spacing-sm);
   }
 
   .filter-sidebar-active {
