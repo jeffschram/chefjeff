@@ -84,13 +84,11 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       return;
     }
 
-    // Show preview immediately
     const localUrl = URL.createObjectURL(file);
     setScanPreview(localUrl);
     setIsScanning(true);
 
     try {
-      // Upload the image to Convex storage first
       const uploadUrl = await generateUploadUrl();
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
@@ -99,7 +97,6 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
       });
       const { storageId } = await uploadResponse.json();
 
-      // Now call Claude vision to analyze it
       const result = await importFromPhoto({ storageId: storageId as Id<"_storage"> });
       setName(result.name);
       setSource(result.source);
@@ -112,7 +109,6 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
     } finally {
       setIsScanning(false);
       setScanPreview(null);
-      // Reset the file input so the same file can be re-selected
       const target = e.target;
       if (target) target.value = "";
     }
@@ -138,19 +134,16 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Image must be smaller than 10MB");
       return;
     }
 
-    // Show local preview immediately
     const localUrl = URL.createObjectURL(file);
     setImagePreview(localUrl);
 
@@ -221,6 +214,7 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
 
   return (
     <div className="recipe-form-container">
+      {/* Header bar */}
       <div className="recipe-form-header">
         <h2>{isEditing ? "Edit Recipe" : "Create New Recipe"}</h2>
         <button className="btn btn-secondary" onClick={onCancel}>
@@ -228,164 +222,141 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
         </button>
       </div>
 
+      {/* AI Import Strip — side-by-side URL + Photo */}
       {!isEditing && (
-        <div className="import-card">
-          <div className="import-card-header">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-            <h3>Import from URL</h3>
-          </div>
-          <p className="import-card-description">
-            Paste a recipe URL and AI will automatically fill in the details below.
-          </p>
-          <div className="import-card-input-row">
-            <input
-              type="url"
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-              placeholder="https://www.example.com/recipe/..."
-              disabled={isImporting}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleImport();
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleImport}
-              disabled={isImporting}
-            >
-              {isImporting ? (
-                <>
-                  <span className="btn-spinner" />
-                  Importing…
-                </>
-              ) : (
-                "Import"
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!isEditing && (
-        <div className="import-card scan-card">
-          <div className="import-card-header">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
-            </svg>
-            <h3>Scan a Recipe Photo</h3>
-          </div>
-          <p className="import-card-description">
-            Take a picture or upload a photo of a recipe — handwritten, printed, or from a cookbook. AI will read it and fill in the details.
-          </p>
-
-          {isScanning && scanPreview ? (
-            <div className="scan-preview-area">
-              <img src={scanPreview} alt="Scanning…" className="scan-preview-img" />
-              <div className="scan-overlay">
-                <span className="btn-spinner" />
-                <span>Reading recipe…</span>
-              </div>
+        <div className="import-strip">
+          {/* URL import */}
+          <div className="import-card import-card--url">
+            <div className="import-card-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <h3>Import from URL</h3>
             </div>
-          ) : (
-            <div className="scan-file-input">
+            <div className="import-card-input-row">
               <input
-                type="file"
-                accept="image/*"
-                onChange={handleScanPhoto}
-                disabled={isScanning}
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="https://example.com/recipe…"
+                disabled={isImporting}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleImport();
+                  }
+                }}
               />
-              <span className="scan-file-hint">JPG, PNG, WebP — max 5MB</span>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleImport}
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <>
+                    <span className="btn-spinner" />
+                    Importing…
+                  </>
+                ) : (
+                  "Import"
+                )}
+              </button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
 
-      <form className="recipe-form" onSubmit={handleSubmit}>
-        {/* Image Upload */}
-        <div className="form-group">
-          <label>Recipe Image</label>
-          <div className="image-upload-area">
-            {imagePreview || imageStorageId ? (
-              <div className="image-preview-container">
-                {imagePreview && (
-                  <img src={imagePreview} alt="Recipe preview" className="image-preview" />
-                )}
-                {!imagePreview && imageStorageId && (
-                  <div className="image-preview-placeholder">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                    <span>Image attached (save to preview)</span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="image-remove-btn"
-                  onClick={handleRemoveImage}
-                  title="Remove image"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
+          {/* Photo scan */}
+          <div className="import-card import-card--scan">
+            <div className="import-card-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              <h3>Scan a Photo</h3>
+            </div>
+            {isScanning && scanPreview ? (
+              <div className="scan-preview-area">
+                <img src={scanPreview} alt="Scanning…" className="scan-preview-img" />
+                <div className="scan-overlay">
+                  <span className="btn-spinner" />
+                  <span>Reading recipe…</span>
+                </div>
               </div>
             ) : (
-              <label className="image-upload-dropzone" htmlFor="image-upload">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-                <span>{isUploading ? "Uploading..." : "Click to upload an image"}</span>
-                <span className="image-upload-hint">JPG, PNG, WebP — max 10MB</span>
-              </label>
-            )}
-            <input
-              ref={fileInputRef}
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              disabled={isUploading}
-              style={{ display: "none" }}
-            />
-            {(imagePreview || imageStorageId) && (
-              <label htmlFor="image-upload" className="btn btn-secondary image-change-btn">
-                Change Image
-              </label>
+              <div className="scan-file-input">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleScanPhoto}
+                  disabled={isScanning}
+                />
+              </div>
             )}
           </div>
         </div>
+      )}
 
-        <div className="form-group">
-          <label>Recipe Name *</label>
-          <RichTextEditor
-            content={name}
-            onChange={setName}
-            placeholder="Enter recipe name"
+      {/* Main form */}
+      <form className="recipe-form" onSubmit={handleSubmit}>
+        {/* Image — compact inline */}
+        <div className="form-row form-row--image">
+          {imagePreview ? (
+            <div className="image-thumb-container">
+              <img src={imagePreview} alt="Recipe" className="image-thumb" />
+              <button
+                type="button"
+                className="image-remove-btn"
+                onClick={handleRemoveImage}
+                title="Remove image"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <label className="image-thumb-upload" htmlFor="image-upload">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </label>
+          )}
+          <input
+            ref={fileInputRef}
+            id="image-upload"
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            disabled={isUploading}
+            style={{ display: "none" }}
           />
+          <div className="form-row--image-fields">
+            <div className="form-group form-group--inline">
+              <label>Recipe Name *</label>
+              <RichTextEditor
+                content={name}
+                onChange={setName}
+                placeholder="Enter recipe name"
+                compact
+              />
+            </div>
+            <div className="form-group form-group--inline">
+              <label>Source</label>
+              <RichTextEditor
+                content={source}
+                onChange={setSource}
+                placeholder="Website, cookbook, or person"
+                compact
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>Source (optional)</label>
-          <RichTextEditor
-            content={source}
-            onChange={setSource}
-            placeholder="Website, cookbook, or person"
-          />
-        </div>
-
+        {/* Description */}
         <div className="form-group">
           <label>Description *</label>
           <RichTextEditor
@@ -395,24 +366,28 @@ export function RecipeForm({ recipeId, onCancel, onSave }: RecipeFormProps) {
           />
         </div>
 
-        <div className="form-group">
-          <label>Ingredients *</label>
-          <RichTextEditor
-            content={ingredients}
-            onChange={setIngredients}
-            placeholder="List ingredients"
-          />
+        {/* Ingredients + Instructions — side by side on wide screens */}
+        <div className="form-columns">
+          <div className="form-group">
+            <label>Ingredients *</label>
+            <RichTextEditor
+              content={ingredients}
+              onChange={setIngredients}
+              placeholder="List ingredients"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Instructions *</label>
+            <RichTextEditor
+              content={instructions}
+              onChange={setInstructions}
+              placeholder="Step-by-step instructions"
+            />
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>Instructions *</label>
-          <RichTextEditor
-            content={instructions}
-            onChange={setInstructions}
-            placeholder="Step-by-step instructions"
-          />
-        </div>
-
+        {/* Actions */}
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancel}>
             Cancel
