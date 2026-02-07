@@ -5,6 +5,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RichTextEditor } from "./RichTextEditor";
+import { CATEGORIES } from "../../convex/categories";
 
 export function RecipeForm() {
   const { slug } = useParams<{ slug: string }>();
@@ -23,6 +24,9 @@ export function RecipeForm() {
   const [description, setDescription] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [category, setCategory] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -67,6 +71,8 @@ export function RecipeForm() {
       setDescription(result.description);
       setIngredients(result.ingredients);
       setInstructions(result.instructions);
+      if (result.category) setCategory(result.category);
+      if (result.tags?.length) setTags(result.tags);
       if (result.imageStorageId) {
         setImageStorageId(result.imageStorageId as Id<"_storage">);
       }
@@ -114,6 +120,8 @@ export function RecipeForm() {
       setDescription(result.description);
       setIngredients(result.ingredients);
       setInstructions(result.instructions);
+      if (result.category) setCategory(result.category);
+      if (result.tags?.length) setTags(result.tags);
       toast.success("Recipe extracted from photo! Review the fields below.");
     } catch (error: any) {
       toast.error(error.message || "Failed to extract recipe from photo");
@@ -132,6 +140,8 @@ export function RecipeForm() {
       setDescription(recipeBySlug.description);
       setIngredients(recipeBySlug.ingredients);
       setInstructions(recipeBySlug.instructions);
+      setCategory(recipeBySlug.category || "");
+      setTags(recipeBySlug.tags || []);
       if (recipeBySlug.imageStorageId) {
         setImageStorageId(recipeBySlug.imageStorageId);
       }
@@ -203,6 +213,8 @@ export function RecipeForm() {
           description: description.trim(),
           ingredients: ingredients.trim(),
           instructions: instructions.trim(),
+          category: category || undefined,
+          tags: tags.length > 0 ? tags : undefined,
           imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe updated successfully!");
@@ -215,6 +227,8 @@ export function RecipeForm() {
           description: description.trim(),
           ingredients: ingredients.trim(),
           instructions: instructions.trim(),
+          category: category || undefined,
+          tags: tags.length > 0 ? tags : undefined,
           imageStorageId: imageStorageId || undefined,
         });
         toast.success("Recipe created successfully!");
@@ -397,6 +411,72 @@ export function RecipeForm() {
             onChange={setDescription}
             placeholder="Brief description of the recipe"
           />
+        </div>
+
+        {/* Category + Tags */}
+        <div className="form-row form-row--category-tags">
+          <div className="form-group form-group--category">
+            <label>Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="category-select"
+            >
+              <option value="">Select a category…</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group form-group--tags">
+            <label>Tags</label>
+            <div className="tags-input-container">
+              <div className="tags-chips">
+                {tags.map((tag) => (
+                  <span key={tag} className="tag-chip">
+                    {tag}
+                    <button
+                      type="button"
+                      className="tag-chip-remove"
+                      onClick={() => setTags(tags.filter((t) => t !== tag))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder={tags.length === 0 ? "Add tags (e.g. italian, quick, vegetarian)" : "Add another…"}
+                className="tags-text-input"
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
+                    e.preventDefault();
+                    const newTag = tagInput.trim().toLowerCase().replace(/,/g, "");
+                    if (newTag && !tags.includes(newTag)) {
+                      setTags([...tags, newTag]);
+                    }
+                    setTagInput("");
+                  }
+                  if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+                    setTags(tags.slice(0, -1));
+                  }
+                }}
+                onBlur={() => {
+                  if (tagInput.trim()) {
+                    const newTag = tagInput.trim().toLowerCase().replace(/,/g, "");
+                    if (newTag && !tags.includes(newTag)) {
+                      setTags([...tags, newTag]);
+                    }
+                    setTagInput("");
+                  }
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Ingredients + Instructions — side by side on wide screens */}

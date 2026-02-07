@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 
 export function RecipeView() {
@@ -78,6 +78,31 @@ export function RecipeView() {
               <span className="recipe-source-inline rich-content" dangerouslySetInnerHTML={{ __html: recipe.source }} />
             )}
           </p>
+          {(recipe.category || (recipe.tags && recipe.tags.length > 0)) && (
+            <div className="recipe-taxonomy">
+              {recipe.category && (
+                <Link
+                  to={`/?category=${encodeURIComponent(recipe.category)}`}
+                  className="category-badge category-badge--link"
+                >
+                  {recipe.category}
+                </Link>
+              )}
+              {recipe.tags && recipe.tags.length > 0 && (
+                <div className="recipe-tags">
+                  {recipe.tags.map((tag: string) => (
+                    <Link
+                      key={tag}
+                      to={`/?tag=${encodeURIComponent(tag)}`}
+                      className="tag-badge tag-badge--link"
+                    >
+                      {tag}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </header>
 
         <section className="recipe-section">

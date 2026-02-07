@@ -113,6 +113,8 @@ The JSON must have these exact fields:
 - "description": A brief 1-3 sentence description of the dish based on what you can see (string)
 - "ingredients": The full ingredients list, with each ingredient on its own line (string)
 - "instructions": The full step-by-step instructions, numbered, with each step on its own line (string)
+- "category": ONE of these categories that best fits: "Breakfast", "Lunch", "Dinner", "Appetizer", "Side Dish", "Dessert", "Snack", "Beverage", "Bread", "Sauce & Condiment", "Soup & Stew", "Salad" (string)
+- "tags": An array of 3-6 short descriptive tags like cuisine type, dietary info, cooking method, or characteristics. Examples: "italian", "vegetarian", "quick", "comfort food", "grilled", "gluten-free", "one-pot", "spicy", "holiday". Use lowercase. (array of strings)
 
 For ingredients, format each on its own line like:
 - 2 cups flour
@@ -152,6 +154,8 @@ If you cannot find or read a recipe in this image, return: {"error": "Could not 
         description: parsed.description || "",
         ingredients: parsed.ingredients || "",
         instructions: parsed.instructions || "",
+        category: parsed.category || "",
+        tags: Array.isArray(parsed.tags) ? parsed.tags.map((t: any) => String(t).toLowerCase()) : [],
       };
     } catch (error: any) {
       if (error.message?.includes("Could not read")) {
@@ -269,6 +273,8 @@ The JSON must have these exact fields:
 - "description": A brief 1-3 sentence description of the dish (string)
 - "ingredients": The full ingredients list, with each ingredient on its own line (string)
 - "instructions": The full step-by-step instructions, numbered, with each step on its own line (string)
+- "category": ONE of these categories that best fits: "Breakfast", "Lunch", "Dinner", "Appetizer", "Side Dish", "Dessert", "Snack", "Beverage", "Bread", "Sauce & Condiment", "Soup & Stew", "Salad" (string)
+- "tags": An array of 3-6 short descriptive tags like cuisine type, dietary info, cooking method, or characteristics. Examples: "italian", "vegetarian", "quick", "comfort food", "grilled", "gluten-free", "one-pot", "spicy", "holiday". Use lowercase. (array of strings)
 
 For ingredients, format each on its own line like:
 - 2 cups flour
@@ -311,6 +317,8 @@ ${pageContent}`,
         description: parsed.description || "",
         ingredients: parsed.ingredients || "",
         instructions: parsed.instructions || "",
+        category: parsed.category || "",
+        tags: Array.isArray(parsed.tags) ? parsed.tags.map((t: any) => String(t).toLowerCase()) : [],
         imageStorageId,
         imageUrl: imageUrl || null,
       };
