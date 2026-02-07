@@ -1,20 +1,16 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import { useNavigate } from "react-router-dom";
 
-interface RecipeListProps {
-  onCreateNew: () => void;
-  onViewRecipe: (id: Id<"recipes">) => void;
-}
-
-export function RecipeList({ onCreateNew, onViewRecipe }: RecipeListProps) {
+export function RecipeList() {
   const recipes = useQuery(api.recipes.list) || [];
+  const navigate = useNavigate();
 
   return (
     <div className="recipe-list-container">
       <div className="recipe-list-header">
         <h2>My Recipes</h2>
-        <button className="btn btn-primary" onClick={onCreateNew}>
+        <button className="btn btn-primary" onClick={() => navigate("/new")}>
           + Create New Recipe
         </button>
       </div>
@@ -24,14 +20,14 @@ export function RecipeList({ onCreateNew, onViewRecipe }: RecipeListProps) {
           <div style={{ fontSize: '3rem', marginBottom: '0.5rem', opacity: 0.3 }}>✦</div>
           <h3>No recipes yet</h3>
           <p>Start building your recipe collection by creating your first recipe.</p>
-          <button className="btn btn-primary" onClick={onCreateNew}>
+          <button className="btn btn-primary" onClick={() => navigate("/new")}>
             Create Your First Recipe
           </button>
         </div>
       ) : (
         <div className="recipe-grid">
           {recipes.map((recipe) => (
-            <div key={recipe._id} className="recipe-card" onClick={() => onViewRecipe(recipe._id)}>
+            <div key={recipe._id} className="recipe-card" onClick={() => navigate(`/recipe/${recipe._id}`)}>
               <div className="recipe-card-image">
                 {recipe.imageUrl ? (
                   <img src={recipe.imageUrl} alt="" />

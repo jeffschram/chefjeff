@@ -1,15 +1,14 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-interface RecipeViewProps {
-  recipeId: Id<"recipes">;
-  onEdit: () => void;
-  onBack: () => void;
-}
+export function RecipeView() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const recipeId = id as Id<"recipes">;
 
-export function RecipeView({ recipeId, onEdit, onBack }: RecipeViewProps) {
   const recipe = useQuery(api.recipes.get, { id: recipeId });
   const deleteRecipe = useMutation(api.recipes.remove);
 
@@ -25,7 +24,7 @@ export function RecipeView({ recipeId, onEdit, onBack }: RecipeViewProps) {
     return (
       <div className="error-state">
         <h2>Recipe not found</h2>
-        <button className="btn btn-primary" onClick={onBack}>
+        <button className="btn btn-primary" onClick={() => navigate("/")}>
           Back to Recipes
         </button>
       </div>
@@ -37,7 +36,7 @@ export function RecipeView({ recipeId, onEdit, onBack }: RecipeViewProps) {
       try {
         await deleteRecipe({ id: recipeId });
         toast.success("Recipe deleted successfully");
-        onBack();
+        navigate("/");
       } catch (error) {
         toast.error("Failed to delete recipe");
       }
@@ -47,11 +46,11 @@ export function RecipeView({ recipeId, onEdit, onBack }: RecipeViewProps) {
   return (
     <div className="recipe-view-container">
       <div className="recipe-view-header">
-        <button className="btn btn-secondary" onClick={onBack}>
+        <button className="btn btn-secondary" onClick={() => navigate("/")}>
           ← Back to Recipes
         </button>
         <div className="recipe-actions">
-          <button className="btn btn-primary" onClick={onEdit}>
+          <button className="btn btn-primary" onClick={() => navigate(`/recipe/${recipeId}/edit`)}>
             Edit Recipe
           </button>
           <button className="btn btn-danger" onClick={handleDelete}>
