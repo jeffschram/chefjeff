@@ -9,6 +9,8 @@ export default defineSchema({
     description: v.string(),
     ingredients: v.string(),
     instructions: v.string(),
+    category: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
     imageStorageId: v.optional(v.id("_storage")),
     userId: v.string(),
   })
